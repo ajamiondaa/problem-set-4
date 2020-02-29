@@ -1,0 +1,272 @@
+---
+title: "Problem Set 4"
+author: "Soowon Jo"
+date: "2/29/2020"
+output: 
+  pdf_document: 
+    extra_dependencies: bbm
+    latex_engine: xelatex
+---
+## Data Preparation
+```{r}
+library(tidyverse)
+library(seriation)
+library(skimr)
+library(dendextend) # for "cutree" function. to cut hierarchical tree
+library(mixtools)
+library(plotGMM)
+library(clValid)
+
+setwd("/Users/soowonjo/Desktop/MachineLearning/PB4/problem-set-4/Data")
+load("legprof-components.v1.0.RData")
+legprof <- x
+```
+## 1. (5 points) Plot the observations.
+
+```{r}
+y <- cbind(c(1, 1, 0, 5, 6, 4), c(4, 3, 4, 1, 2, 0))
+plot(y[,1],y[,2],
+	main = "Scatter plot of simulated data")
+```
+
+## 2. (5 points) Randomly assign a cluster label to each observation. Report the cluster labels for each observation and plot the results with a different color for each cluster (remember to set your seed first).
+
+``` {r}
+set.seed(1234)
+cluster.label <- sample(2, nrow(y), replace = T)
+cluster.label
+
+plot(y[,1], y[,2],
+     col=(cluster.label + 1))
+```
+
+## 3. (10 points) Compute the centroid for each cluster.
+
+```{r}
+centroid1 <- c(mean(y[cluster.label == 1, 1]),
+                mean(y[cluster.label == 1, 2]))
+centroid2 <- c(mean(y[cluster.label == 2, 1]),
+                mean(y[cluster.label == 2, 2]))
+
+plot(y[,1], y[,2],
+     col=(cluster.label + 1))
+
+# centroid points
+points(centroid1[1], centroid1[2], 
+       col = 2, pch = 8)
+points(centroid2[1], centroid2[2], 
+       col = 3, pch = 8)
+```
+
+## 4. (10 points) Assign each observation to the centroid to which it is closest, in terms of Euclidean distance. Report the cluster labels for each observation.
+
+``` {r}
+# Assign labels to observations
+labels <- c(2, 2, 2, 1, 1, 1)
+
+# plot relabeled observations
+plot(y[, 1], y[, 2], 
+     col = (labels + 1))
+points(centroid1[1], centroid1[2], 
+       col = 2, pch = 8)
+points(centroid2[1], centroid2[2], 
+       col = 3, pch = 8)
+```
+
+## 5. (5 points) Repeat (3) and (4) until the answers/clusters stop changing.
+
+``` {r}
+centroid1 <- c(mean(y[cluster.label == 1, 1]),
+                mean(y[cluster.label == 1, 2]))
+centroid2 <- c(mean(y[cluster.label == 2, 1]),
+                mean(y[cluster.label == 2, 2]))
+
+plot(y[,1], y[,2],
+     col=(cluster.label + 1))
+
+#  centroid points
+points(centroid1[1], centroid1[2], 
+       col = 2, pch = 8)
+points(centroid2[1], centroid2[2], 
+       col = 3, pch = 8)
+
+# Assign lables to observations 
+labels <- c(2, 2, 2, 1, 1, 1)
+
+# plot relabeled observations
+plot(y[, 1], y[, 2], 
+     col = (labels + 1))
+points(centroid1[1], centroid1[2], 
+       col = 2, pch = 8)
+points(centroid2[1], centroid2[2], 
+       col = 3, pch = 8)
+```
+
+## 6. (10 points) Reproduce the original plot from (1), but this time color the observations according to the clusters labels you obtained by iterating the cluster centroid calculation and assignments.
+
+``` {r}
+plot(y[, 1], y[, 2], 
+     col = (labels + 1))
+```
+
+# Clustering State Legislative Professionalism
+
+## 1. Load the state legislative professionalism data. See the codebook (or above) for further reference.
+
+## 2. (5 points) Munge the data:
+
+__a. select only the continuous features that should capture a state legislature’s level of “professionalism” (session length (total and regular), salary, and expenditures); b. restrict the data to only include the 2009/10 legislative session for consistency; c. omit all missing values; d. standardize the input features; e. and anything else you think necessary to get this subset of data into workable form (hint: consider storing the state names as a separate object to be used in plotting later)__
+```{r}
+skim(legprof)
+
+legprof_subset <- legprof %>% 
+  filter(sessid == "2009/10") %>%
+  select(state, t_slength, slength, salary_real, expend) 
+  
+legprof_states <- scale(legprof_subset[, -c(1)]) %>%  
+  as.tibble() %>%
+  na.omit() 
+
+# store state names 
+states <- legprof_subset %>%
+	na.omit() %>%
+	select(state)
+states
+```
+
+## 3. (5 points) Diagnose clusterability in any way you’d prefer (e.g., sparse sampling, ODI, etc.); display the results and discuss the likelihood that natural, non-random structure exist in these data. Hint: We didn't cover how to do this R in class, but consider dissplot() from the seriation package, the factoextra package, and others for calculating, presenting, and exploring the clusterability of some feature space.
+
+``` {r}
+prof_dist <- dist(legprof_states, method = "manhattan")
+dissplot(prof_dist)
+```
+There may be few squares shown in the ODI, but the unclear delineation indicates very low likelihood for clusterability and natural, non-random structure to exist.
+
+## 4. (5 points) Fit an agglomerative hierarchical clustering algorithm using any linkage method you prefer, to these data and present the results. Give a quick, high level summary of the output and general patterns.
+
+``` {r}
+hc_complete <- hclust(prof_dist, 
+                      method = "complete"); plot(hc_complete, hang = -1)
+```
+The y-axis is a measure of closeness of either individual data points or clusters. The x-axis represents the objects and clusters. Our main interest is in similarity and clustering. Each joining of two clusters is represented on the graph by the splitting of a vertical line into two verticle lines. The vertical position of the split, shown by the short horizontal bar, give the distance (dissimiliariy) between the two clusters. 
+
+In this dendrogram, we see the three clusters as three branches that occur at about the same vertical distance. However, this interpretation can be justified only when the ultrametric tree in equality holds. 
+
+As an example, the dendogram suggests that Massachusetts(21) and New York(32) are much closer to each other than is New York(32) to Michigan(22).
+
+## 5. (5 points) Fit a k-means algorithm to these data and present the results. Give a quick, high level summary of the output and general patterns. Initialize the algorithm at k=2, and then check this assumption in the validation questions below.
+
+``` {r}
+set.seed(634)
+
+kmeans <- kmeans(legprof_states, 
+                 centers = 2,
+                 nstart = 15)
+str(kmeans)
+
+variable_1 <- as.data.frame(kmeans$cluster) 
+variable_2 <- states
+
+cbind(variable_1, variable_2)
+```
+The result from kmeans shows that total 6 states (California, Massachusetts, Michigan, New York, Ohio, and Pennsylvania) form one cluster and the remaining 43 states were placed into another cluster. 
+
+## 6. (5 points) Fit a Gaussian mixture model via the EM algorithm to these data and present the results. Give a quick, high level summary of the output and general patterns. Initialize the algorithm at k = 2, and then check this assumption in the validation questions below.
+
+``` {r}
+set.seed(2000) 
+gmm <- mvnormalmixEM(legprof_states, k = 2)
+```
+
+```{r}
+gmm$mu
+```
+```{r}
+gmm$sigma
+```
+
+```{r}
+gmm$lambda
+```
+
+```{r}
+posterior <- data.frame(cbind(gmm$x, gmm$posterior))
+posterior$component <- ifelse(posterior$comp.1 > 0.5, 1, 2)
+table(posterior$component)
+```
+Based on gmm, we can see that one cluster has 44 states whereas the other cluster has 5 states. These numbers are different from those found earlier using kmeans. In addition, with two lambda values (0.898 and 0.102), we could say that the larger lambda yields a higher curve, and substantively, that this cluster has more observations. Moreover, the probability scores of belonging to each cluster appear very high or low here. Usually Gaussian mixture model uses soft clustering technique, in which observations may belong to multiple clusters. Here, however, there seem to be very high or low probabilities for belonging to a cluster.  
+
+## 7. (15 points) Compare output of all in visually useful, simple ways (e.g., present the dendrogram, plot by state cluster assignment across two features like salary and expenditures, etc.). There should be several plots of comparison and output.
+
+``` {r}
+plot.mixEM(gmm)
+
+ggplot(data.frame(x = gmm$x[,1])) +
+  geom_histogram(aes(x, ..density..), fill = "darkgray") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm$mu[[1]][1], gmm$sigma[[1]][1], lam = gmm$lambda[1]),
+                colour = "darkred") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm$mu[[2]][1], gmm$sigma[[2]][1], lam = gmm$lambda[2]),
+                colour = "darkblue") +
+  xlab("t_slength") +
+  ylab("Density") + 
+  theme_bw()
+
+ggplot(data.frame(x = gmm$x[,2])) +
+  geom_histogram(aes(x, ..density..), fill = "darkgray") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm$mu[[1]][2], gmm$sigma[[1]][2], lam = gmm$lambda[1]),
+                colour = "darkred") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm$mu[[2]][2], gmm$sigma[[2]][2], lam = gmm$lambda[2]),
+                colour = "darkblue") +
+  xlab("slength") +
+  ylab("Density") + 
+  theme_bw()
+
+ggplot(data.frame(x = gmm$x[,3])) +
+  geom_histogram(aes(x, ..density..), fill = "darkgray") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm$mu[[1]][3], gmm$sigma[[1]][3], lam = gmm$lambda[1]),
+                colour = "darkred") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm$mu[[2]][3], gmm$sigma[[2]][3], lam = gmm$lambda[2]),
+                colour = "darkblue") +
+  xlab("salary_real") +
+  ylab("Density") + 
+  theme_bw()
+
+ggplot(data.frame(x = gmm$x[,4])) +
+  geom_histogram(aes(x, ..density..), fill = "darkgray") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm$mu[[1]][4], gmm$sigma[[1]][4], lam = gmm$lambda[1]),
+                colour = "darkred") +
+  stat_function(geom = "line", fun = plot_mix_comps,
+                args = list(gmm$mu[[2]][4], gmm$sigma[[2]][4], lam = gmm$lambda[2]),
+                colour = "darkblue") +
+  xlab("expend") +
+  ylab("Density") + 
+  theme_bw()
+```
+If the histogram shows a better fit of data, this suggests that certain variable is explaining the clustering well. Observations here are clustered based on 's_length' and 't_slength' along with some outliers in the data. If we look at the curve shown in the histogram that has 'salary_real' as the variable, it fits the data fairly well, meaning that it moderately accounts for the clustering. The curve in the histogram with a variable 'extend' fits the data poorly, thus suggesting that it has a weak influence on the clustering.    
+
+## 8. (5 points) Select a single validation strategy (e.g., compactness via min(WSS), average silhouette width, etc.), and calculate for all three algorithms. Display and compare your results for all three algorithms you fit (hierarchical, k-means, GMM). Hint: Here again, we didn't cover this in R in class, but think about using the clValid package, though there are many other packages and ways to validate cluster patterns across iterations.
+
+``` {r}
+legprof_states_mat <- as.matrix(legprof_states)
+clvalid <- clValid(legprof_states_mat, 2:5,
+                          validation = "internal",
+                          clMethods = c("model", "kmeans", "hierarchical"))
+summary(clvalid)
+```
+According to the result, the hiearchical method shows as the strongest performer on all three dimensions (Connectivity, Dunn, Silhouette). If the method has high values for silhouette width and the Dunn index and low values on connectivity, it is considered as the strongest performer.  
+
+## 9. (10 points) Discuss the validation output, e.g., "What can you take away from the fit?", "Which approach is optimal? And optimal at what value of k?", "What are reasons you could imagine selecting a technically “sub-optimal” clustering method, regardless of the validation statistics?"
+
+The internal validation helped us to see how well clustering algorithms perform relative to other specifications even in a circumstance when we did not have a label that we could use to validate via an external measure. To do so, we compared across different numbers of clusters and types of clustering to see which method is optimal. There is no consistent best performing method among Dunn, silhouette width, and connectivity, so we prioritized which metrics should be considered the most important. 
+
+In this case, the hiearchical clustering algorithm was the optimal method across all three measures of internal validation (as mentioned in Q8). To be more specific, 2 clusters would be the optimal for connectivity and silhouette width, while 3 clusters would be optimal for Dunn index. 
+
+It is nearly possible to come up with the strongest performer on all dimensions. Therefore, we may need to choose which measure should be prioritized and what number of clusters are commonly used in the field of interest. For instance, we would use the sub-optimal clustering method if particular method has more information in the dataset. GMM, for example, has more information such as probability of belonging to one of the clusters than kmeans so that we would select GMM over kmeans method even if it is suboptimal.  
+
